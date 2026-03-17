@@ -136,6 +136,13 @@ function App({ initialView = 'abrir' }) {
     return () => window.clearTimeout(id)
   }, [toast])
 
+  useEffect(() => {
+    document.title =
+      location.pathname === '/ti'
+        ? 'ChameTI | Painel da TI'
+        : 'ChameTI | Abrir Chamado'
+  }, [location.pathname])
+
   async function handleCriarChamado(dados) {
     const dataAgora = new Date().toLocaleString('pt-BR', {
       day: '2-digit',
@@ -638,14 +645,14 @@ function App({ initialView = 'abrir' }) {
                 <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor" />
               </svg>
             </div>
-            <h2 className="text-lg font-bold tracking-tight text-slate-100">IT Portal</h2>
+            <h2 className="text-lg font-bold tracking-tight text-slate-100">ChameTI · Painel TI</h2>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="hidden items-center rounded-xl bg-slate-800 px-3 py-2 sm:flex">
             <input
               className="w-56 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none"
-              placeholder="Search tickets..."
+              placeholder="Buscar chamados..."
             />
           </div>
           <div className="h-10 w-10 rounded-full border-2 border-primary/30 bg-slate-700" />
