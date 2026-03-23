@@ -269,12 +269,16 @@ function App({ initialView = 'abrir' }) {
         type: 'error',
         message: 'Não foi possível registrar o chamado. Tente novamente.'
       })
-      return null
+      return { ok: false, ticket: null }
     }
 
-    setTickets((prev) => [data, ...prev])
-    setSelectedTicketId(data.id)
-    return data
+    if (data) {
+      setTickets((prev) => [data, ...prev])
+      setSelectedTicketId(data.id)
+    } else {
+      await recarregarChamados({ silent: true })
+    }
+    return { ok: true, ticket: data ?? null }
   }
 
   async function handleAssumirChamado(id) {
@@ -461,16 +465,16 @@ function App({ initialView = 'abrir' }) {
     submitLockRef.current = true
     setSubmitting(true)
     try {
-      const created = await handleCriarChamado(dados)
-      if (created) {
+      const result = await handleCriarChamado(dados)
+      if (result.ok) {
         lastSubmissionRef.current = { signature, at: Date.now() }
-        event.currentTarget.reset()
         const openTickets = tickets.filter((t) => t.status === 'Aberto').length + 1
         setSubmitSuccessModal({
           open: true,
-          ticketId: formatarId(created.id),
+          ticketId: result.ticket?.id ? formatarId(result.ticket.id) : 'novo',
           openTickets
         })
+        event.currentTarget.reset()
       } else {
         setToast({
           type: 'error',
