@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import { supabase } from './supabaseClient'
@@ -66,6 +66,8 @@ function App({ initialView = 'abrir' }) {
   const [submitting, setSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [toast, setToast] = useState(null)
+  const submitLockRef = useRef(false)
+  const lastSubmissionRef = useRef({ signature: '', at: 0 })
 
   const [tiAutenticado, setTiAutenticado] = useState(false)
   const [senhaTi, setSenhaTi] = useState('')
@@ -220,7 +222,7 @@ function App({ initialView = 'abrir' }) {
         type: 'error',
         message: 'Não foi possível registrar o chamado. Tente novamente.'
       })
-      return
+      return false
     }
 
     setTickets((prev) => [data, ...prev])
@@ -229,6 +231,7 @@ function App({ initialView = 'abrir' }) {
       type: 'success',
       message: `Chamado #${formatarId(data.id)} aberto com sucesso.`
     })
+    return true
   }
 
   async function handleAssumirChamado(id) {
@@ -364,6 +367,8 @@ function App({ initialView = 'abrir' }) {
 
   async function handleSubmitForm(event) {
     event.preventDefault()
+    if (submitLockRef.current || submitting) return
+
     const formData = new FormData(event.currentTarget)
     const dados = {
       nome: formData.get('nome')?.toString().trim() ?? '',
@@ -386,12 +391,38 @@ function App({ initialView = 'abrir' }) {
       return
     }
 
+    const signature = JSON.stringify({
+      nome: dados.nome,
+      setor: dados.setor,
+      tipo: dados.tipo,
+      titulo: dados.titulo,
+      descricao: dados.descricao,
+      localizacao: dados.localizacao,
+      prioridade: dados.prioridade
+    })
+    const now = Date.now()
+    if (
+      lastSubmissionRef.current.signature === signature &&
+      now - lastSubmissionRef.current.at < 5000
+    ) {
+      setToast({
+        type: 'error',
+        message: 'Chamado duplicado detectado. Aguarde alguns segundos antes de reenviar.'
+      })
+      return
+    }
+
     setFormErrors({})
+    submitLockRef.current = true
     setSubmitting(true)
     try {
-      await handleCriarChamado(dados)
-      event.currentTarget.reset()
+      const created = await handleCriarChamado(dados)
+      if (created) {
+        lastSubmissionRef.current = { signature, at: Date.now() }
+        event.currentTarget.reset()
+      }
     } finally {
+      submitLockRef.current = false
       setSubmitting(false)
     }
   }
