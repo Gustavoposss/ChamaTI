@@ -53,6 +53,7 @@ function App({ initialView = 'abrir' }) {
 
   const [loadingTickets, setLoadingTickets] = useState(true)
   const [errorTickets, setErrorTickets] = useState(null)
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
 
   const [tecnicoAtual, setTecnicoAtual] = useState(() => {
     const salvo = window.localStorage.getItem('chameti-tecnico-atual')
@@ -99,6 +100,15 @@ function App({ initialView = 'abrir' }) {
   }, [tickets, filtroStatus, filtroPrioridade, filtroSetor])
 
   async function recarregarChamados({ silent = false } = {}) {
+    if (!navigator.onLine) {
+      setIsOnline(false)
+      setErrorTickets('Sem conexão com a internet. Verifique sua rede e tente novamente.')
+      if (!silent) {
+        setLoadingTickets(false)
+      }
+      return
+    }
+
     if (!silent) {
       setLoadingTickets(true)
       setErrorTickets(null)
@@ -110,9 +120,17 @@ function App({ initialView = 'abrir' }) {
       .order('id', { ascending: false })
 
     if (error) {
-      // eslint-disable-next-line no-console
-      console.error('Erro ao carregar chamados:', error)
-      setErrorTickets('Não foi possível carregar os chamados. Tente novamente em alguns segundos.')
+      const networkError =
+        error?.message?.toLowerCase().includes('failed to fetch') ||
+        error?.message?.toLowerCase().includes('network')
+
+      if (networkError) {
+        setErrorTickets('Falha de rede ao carregar chamados. Verifique sua conexão.')
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('Erro ao carregar chamados:', error)
+        setErrorTickets('Não foi possível carregar os chamados. Tente novamente em alguns segundos.')
+      }
       if (!silent) {
         setLoadingTickets(false)
       }
@@ -132,6 +150,26 @@ function App({ initialView = 'abrir' }) {
     recarregarChamados()
   }, [])
 
+  useEffect(() => {
+    const onOnline = () => {
+      setIsOnline(true)
+      setErrorTickets(null)
+      recarregarChamados({ silent: true })
+    }
+    const onOffline = () => {
+      setIsOnline(false)
+      setErrorTickets('Sem conexão com a internet. Verifique sua rede e tente novamente.')
+    }
+
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
+
   // Mantém o nome do técnico entre atualizações e recargas de página.
   useEffect(() => {
     window.localStorage.setItem('chameti-tecnico-atual', tecnicoAtual)
@@ -139,6 +177,8 @@ function App({ initialView = 'abrir' }) {
 
   // Atualização automática dos chamados sem precisar F5.
   useEffect(() => {
+    if (!navigator.onLine) return undefined
+
     const channel = supabase
       .channel('chamados-realtime')
       .on(
@@ -152,6 +192,7 @@ function App({ initialView = 'abrir' }) {
 
     // Fallback para ambientes onde realtime esteja desativado.
     const pollId = window.setInterval(() => {
+      if (!navigator.onLine) return
       recarregarChamados({ silent: true })
     }, 15000)
 
@@ -457,6 +498,11 @@ function App({ initialView = 'abrir' }) {
   if (view === 'abrir') {
     return (
       <div className="min-h-screen bg-background-dark text-slate-100 font-display">
+        {!isOnline && (
+          <div className="bg-amber-500/20 px-4 py-2 text-center text-xs font-semibold text-amber-200">
+            Sem conexão com a internet. Os chamados serão atualizados quando a conexão voltar.
+          </div>
+        )}
         <div className="mx-auto flex min-h-screen w-full max-w-[980px] flex-col px-4 py-5 md:px-10">
           <header className="mb-6 flex items-center justify-between border-b border-slate-800 pb-6">
             <div className="flex items-center gap-3">
@@ -667,6 +713,11 @@ function App({ initialView = 'abrir' }) {
   if (location.pathname === '/ti' && !tiAutenticado) {
     return (
       <div className="min-h-screen bg-background-dark px-4 py-8 text-slate-100">
+        {!isOnline && (
+          <div className="mx-auto mb-4 max-w-xl rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200">
+            Sem conexão com a internet no momento.
+          </div>
+        )}
         <main className="mx-auto max-w-xl rounded-xl border border-slate-800 bg-slate-900/70 p-6">
           <h2 className="mb-2 text-2xl font-black">Acesso da equipe de TI</h2>
           <p className="mb-6 text-sm text-slate-400">
@@ -706,6 +757,11 @@ function App({ initialView = 'abrir' }) {
 
   return (
     <div className="min-h-screen bg-background-dark font-display text-slate-100">
+      {!isOnline && (
+        <div className="bg-amber-500/20 px-4 py-2 text-center text-xs font-semibold text-amber-200">
+          Sem conexão com a internet. A atualização automática será retomada quando a conexão voltar.
+        </div>
+      )}
       <header className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3 text-primary">
