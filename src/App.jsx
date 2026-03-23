@@ -414,6 +414,7 @@ function App({ initialView = 'abrir' }) {
 
   async function handleSubmitForm(event) {
     event.preventDefault()
+    const formElement = event.currentTarget
     if (submitLockRef.current || submitting) return
 
     const formData = new FormData(event.currentTarget)
@@ -474,7 +475,7 @@ function App({ initialView = 'abrir' }) {
           ticketId: result.ticket?.id ? formatarId(result.ticket.id) : 'novo',
           openTickets
         })
-        event.currentTarget.reset()
+        formElement.reset()
       } else {
         setToast({
           type: 'error',
