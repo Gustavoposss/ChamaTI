@@ -67,8 +67,14 @@ function App({ initialView = 'abrir' }) {
   const [submitting, setSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [toast, setToast] = useState(null)
+  const [submitSuccessModal, setSubmitSuccessModal] = useState({
+    open: false,
+    ticketId: null,
+    openTickets: 0
+  })
   const submitLockRef = useRef(false)
   const lastSubmissionRef = useRef({ signature: '', at: 0 })
+  const DUPLICATE_GUARD_WINDOW_MS = 60000
 
   const [tiAutenticado, setTiAutenticado] = useState(false)
   const [senhaTi, setSenhaTi] = useState('')
@@ -263,16 +269,12 @@ function App({ initialView = 'abrir' }) {
         type: 'error',
         message: 'Não foi possível registrar o chamado. Tente novamente.'
       })
-      return false
+      return null
     }
 
     setTickets((prev) => [data, ...prev])
     setSelectedTicketId(data.id)
-    setToast({
-      type: 'success',
-      message: `Chamado #${formatarId(data.id)} aberto com sucesso.`
-    })
-    return true
+    return data
   }
 
   async function handleAssumirChamado(id) {
@@ -444,16 +446,18 @@ function App({ initialView = 'abrir' }) {
     const now = Date.now()
     if (
       lastSubmissionRef.current.signature === signature &&
-      now - lastSubmissionRef.current.at < 5000
+      now - lastSubmissionRef.current.at < DUPLICATE_GUARD_WINDOW_MS
     ) {
       setToast({
         type: 'error',
-        message: 'Chamado duplicado detectado. Aguarde alguns segundos antes de reenviar.'
+        message: 'Solicitação já enviada há instantes. Aguarde até 1 minuto antes de reenviar.'
       })
       return
     }
 
     setFormErrors({})
+    // Marca a assinatura no início da tentativa para bloquear duplo envio mesmo com falha de rede.
+    lastSubmissionRef.current = { signature, at: Date.now() }
     submitLockRef.current = true
     setSubmitting(true)
     try {
@@ -461,6 +465,18 @@ function App({ initialView = 'abrir' }) {
       if (created) {
         lastSubmissionRef.current = { signature, at: Date.now() }
         event.currentTarget.reset()
+        const openTickets = tickets.filter((t) => t.status === 'Aberto').length + 1
+        setSubmitSuccessModal({
+          open: true,
+          ticketId: formatarId(created.id),
+          openTickets
+        })
+      } else {
+        setToast({
+          type: 'error',
+          message:
+            'Não foi possível confirmar o envio agora. Evite reenviar imediatamente para não duplicar.'
+        })
       }
     } finally {
       submitLockRef.current = false
@@ -694,6 +710,30 @@ function App({ initialView = 'abrir' }) {
             </div>
           </form>
         </div>
+
+        {submitSuccessModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+              <h3 className="text-2xl font-black text-primary">Chamado enviado com sucesso!</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Seu chamado #{submitSuccessModal.ticketId} foi registrado com sucesso.
+              </p>
+              <div className="mt-4 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-cyan-200">Chamados em aberto agora</p>
+                <p className="mt-1 text-3xl font-black text-cyan-300">{submitSuccessModal.openTickets}</p>
+              </div>
+              <button
+                type="button"
+                className="mt-6 w-full rounded-xl bg-primary py-3 text-sm font-bold text-slate-900 transition hover:opacity-90"
+                onClick={() =>
+                  setSubmitSuccessModal({ open: false, ticketId: null, openTickets: 0 })
+                }
+              >
+                Voltar para tela de chamado
+              </button>
+            </div>
+          </div>
+        )}
 
         {toast && (
           <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-emerald-500/50 bg-slate-900 p-4 shadow-2xl">
