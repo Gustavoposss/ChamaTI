@@ -527,9 +527,6 @@ function App({ initialView = 'abrir' }) {
               </div>
               <h2 className="text-xl font-black tracking-tight">ChameTI · HMC</h2>
             </div>
-            <span className="rounded-full bg-primary px-4 py-2 text-xs font-bold tracking-wider text-slate-900">
-              EM USO INTERNO
-            </span>
           </header>
 
           <section className="mb-8">
