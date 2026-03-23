@@ -541,13 +541,7 @@ function App({ initialView = 'abrir' }) {
               type="button"
               className="border-b-[3px] border-primary pb-3 text-sm font-bold text-primary"
             >
-              Abrir chamado - Funcionarios
-            </button>
-            <button
-              type="button"
-              className="border-b-[3px] border-transparent pb-3 text-sm font-bold text-slate-500"
-            >
-              Meus Chamados
+              Abrir chamado
             </button>
           </div>
 
