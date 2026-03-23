@@ -54,7 +54,10 @@ function App({ initialView = 'abrir' }) {
   const [loadingTickets, setLoadingTickets] = useState(true)
   const [errorTickets, setErrorTickets] = useState(null)
 
-  const [tecnicoAtual, setTecnicoAtual] = useState('João')
+  const [tecnicoAtual, setTecnicoAtual] = useState(() => {
+    const salvo = window.localStorage.getItem('chameti-tecnico-atual')
+    return salvo || 'João'
+  })
 
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [filtroPrioridade, setFiltroPrioridade] = useState('todos')
@@ -93,9 +96,11 @@ function App({ initialView = 'abrir' }) {
       })
   }, [tickets, filtroStatus, filtroPrioridade, filtroSetor])
 
-  async function recarregarChamados() {
-    setLoadingTickets(true)
-    setErrorTickets(null)
+  async function recarregarChamados({ silent = false } = {}) {
+    if (!silent) {
+      setLoadingTickets(true)
+      setErrorTickets(null)
+    }
 
     const { data, error } = await supabase
       .from('chamados')
@@ -106,7 +111,9 @@ function App({ initialView = 'abrir' }) {
       // eslint-disable-next-line no-console
       console.error('Erro ao carregar chamados:', error)
       setErrorTickets('Não foi possível carregar os chamados. Tente novamente em alguns segundos.')
-      setLoadingTickets(false)
+      if (!silent) {
+        setLoadingTickets(false)
+      }
       return
     }
 
@@ -114,11 +121,42 @@ function App({ initialView = 'abrir' }) {
     if (!selectedTicketId && data && data.length > 0) {
       setSelectedTicketId(data[0].id)
     }
-    setLoadingTickets(false)
+    if (!silent) {
+      setLoadingTickets(false)
+    }
   }
 
   useEffect(() => {
     recarregarChamados()
+  }, [])
+
+  // Mantém o nome do técnico entre atualizações e recargas de página.
+  useEffect(() => {
+    window.localStorage.setItem('chameti-tecnico-atual', tecnicoAtual)
+  }, [tecnicoAtual])
+
+  // Atualização automática dos chamados sem precisar F5.
+  useEffect(() => {
+    const channel = supabase
+      .channel('chamados-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chamados' },
+        () => {
+          recarregarChamados({ silent: true })
+        }
+      )
+      .subscribe()
+
+    // Fallback para ambientes onde realtime esteja desativado.
+    const pollId = window.setInterval(() => {
+      recarregarChamados({ silent: true })
+    }, 15000)
+
+    return () => {
+      window.clearInterval(pollId)
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
